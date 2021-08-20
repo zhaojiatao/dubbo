@@ -219,8 +219,13 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
     }
 
+    /**
+     * 框架真正进行服务暴露的入口点
+     */
     protected synchronized void doExport() {
         if (unexported) {
+
+
             throw new IllegalStateException("Already unexported!");
         }
         if (exported) {
