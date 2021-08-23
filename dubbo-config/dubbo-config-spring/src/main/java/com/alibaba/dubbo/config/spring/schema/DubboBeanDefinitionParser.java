@@ -79,12 +79,13 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         beanDefinition.setLazyInit(false);
         String id = element.getAttribute("id");
         // 确保Spring容器没有重复的Bean定义
+
+        //如果xml标签中没有指定自定义的bean，则依次尝试获取XML配置标签name和interface作为Bean唯一id
         if ((id == null || id.length() == 0) && required) {
-            //依次尝试获取XML配置标签name和interface作为Bean唯一id
             String generatedBeanName = element.getAttribute("name");
             if (generatedBeanName == null || generatedBeanName.length() == 0) {
-                //如果协议标签没有指定name，则默认用dubbo
                 if (ProtocolConfig.class.equals(beanClass)) {
+                    //如果协议标签没有指定name，则默认用dubbo
                     generatedBeanName = "dubbo";
                 } else {
                     generatedBeanName = element.getAttribute("interface");
@@ -100,14 +101,17 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
             }
         }
         if (id != null && id.length() > 0) {
+            //判断是否已经存在了重复的id，如果有则报错
             if (parserContext.getRegistry().containsBeanDefinition(id)) {
                 throw new IllegalStateException("Duplicate spring bean id " + id);
             }
-            // 每次解析会向Spring注册新的BeanDefinition,后续会追加属性
+            // 每次解析会向Spring注册新的BeanDefinition
             parserContext.getRegistry().registerBeanDefinition(id, beanDefinition);
+            //追加属性
             beanDefinition.getPropertyValues().addPropertyValue("id", id);
         }
 
+        //解析<protocol>标签
         if (ProtocolConfig.class.equals(beanClass)) {
             for (String name : parserContext.getRegistry().getBeanDefinitionNames()) {
                 BeanDefinition definition = parserContext.getRegistry().getBeanDefinition(name);
@@ -126,6 +130,8 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 RootBeanDefinition classDefinition = new RootBeanDefinition();
                 classDefinition.setBeanClass(ReflectUtils.forName(className));
                 classDefinition.setLazyInit(false);
+                //这个方法主要解析〈dubbo:service〉标签中的name、class和ref等属性
+                //parseProperties方法会把key-value键值对提取出来放到BeanDefinition中， 运行时Spring会自动处理注入值，因此ServiceBean就会包含用户配置的属性值了。
                 parseProperties(element.getChildNodes(), classDefinition);
                 beanDefinition.getPropertyValues().addPropertyValue("ref", new BeanDefinitionHolder(classDefinition, id + "Impl"));
             }
