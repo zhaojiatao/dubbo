@@ -71,6 +71,16 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         this.required = required;
     }
 
+    /**
+     * 本质上是把属性注入Spring框架的BeanDefinition。
+     * 如果属性是引用对象，则Dubbo默认会创建RuntimeBeanReference类型注入，运行时由Spring注入引用对象。
+     * 通过对属性解析的理解，其实Dubbo只做了属性提取的事情，运行时属性注入和转换都是Spring处理的
+     * @param element
+     * @param parserContext
+     * @param beanClass
+     * @param required
+     * @return
+     */
     @SuppressWarnings("unchecked")
     private static BeanDefinition parse(Element element, ParserContext parserContext, Class<?> beanClass, boolean required) {
         //生成 Spring的Bean定义，指定 beanClass 交给Spring反射创建实例
@@ -80,7 +90,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         String id = element.getAttribute("id");
         // 确保Spring容器没有重复的Bean定义
 
-        //如果xml标签中没有指定自定义的bean，则依次尝试获取XML配置标签name和interface作为Bean唯一id
+        //如果xml标签中没有指定自定义的id，则依次尝试获取XML配置标签name和interface作为Bean唯一id
         if ((id == null || id.length() == 0) && required) {
             String generatedBeanName = element.getAttribute("name");
             if (generatedBeanName == null || generatedBeanName.length() == 0) {
@@ -144,13 +154,16 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
 
         Set<String> props = new HashSet<String>();
         ManagedMap parameters = null;
+        //遍历具体配置对象的所有方法，比如ProviderConfig类
         for (Method setter : beanClass.getMethods()) {
             String name = setter.getName();
+            //查找所有set前缀方法，并且只有一个参数的public方法
             if (name.length() > 3 && name.startsWith("set")
                     && Modifier.isPublic(setter.getModifiers())
                     && setter.getParameterTypes().length == 1) {
                 Class<?> type = setter.getParameterTypes()[0];
                 String propertyName = name.substring(3, 4).toLowerCase() + name.substring(4);
+                //提取set对应的属性名称，比如setTimeout，会得到timeout
                 String property = StringUtils.camelToSplitName(propertyName, "-");
                 props.add(property);
                 Method getter = null;
@@ -162,6 +175,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                     } catch (NoSuchMethodException e2) {
                     }
                 }
+                //校验是否有对应属性get或is前缀方法，没有就跳过
                 if (getter == null
                         || !Modifier.isPublic(getter.getModifiers())
                         || !type.equals(getter.getReturnType())) {
@@ -174,6 +188,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 } else if ("arguments".equals(property)) {
                     parseArguments(id, element.getChildNodes(), beanDefinition, parserContext);
                 } else {
+                    //直接获取标签属性值
                     String value = element.getAttribute(property);
                     if (value != null) {
                         value = value.trim();
@@ -239,6 +254,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                                     }
                                     reference = new RuntimeBeanReference(value);
                                 }
+                                //把匹配到的属性注入Spring的Bean
                                 beanDefinition.getPropertyValues().addPropertyValue(propertyName, reference);
                             }
                         }
@@ -246,11 +262,13 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 }
             }
         }
+        //剩余不匹配的attribute当作parameters注入BeanProps中保存了所有正确解析的属性
         NamedNodeMap attributes = element.getAttributes();
         int len = attributes.getLength();
         for (int i = 0; i < len; i++) {
             Node node = attributes.item(i);
             String name = node.getLocalName();
+            //排除已经解析的值
             if (!props.contains(name)) {
                 if (parameters == null) {
                     parameters = new ManagedMap();

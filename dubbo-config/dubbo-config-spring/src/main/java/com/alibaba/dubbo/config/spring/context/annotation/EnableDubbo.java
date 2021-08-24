@@ -36,6 +36,8 @@ import java.lang.annotation.Target;
  * @see DubboComponentScan
  * @see EnableDubboConfig
  * @since 2.5.8
+ *
+ * 注解组合需要分三步，1.自定义新注解 2.新注解写要引入的注解 3.使用@AliasFor建立新老注解的属性对应关系
  */
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

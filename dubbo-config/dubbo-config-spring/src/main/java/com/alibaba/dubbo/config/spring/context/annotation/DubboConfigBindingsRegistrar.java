@@ -44,13 +44,15 @@ public class DubboConfigBindingsRegistrar implements ImportBeanDefinitionRegistr
         AnnotationAttributes attributes = AnnotationAttributes.fromMap(
                 importingClassMetadata.getAnnotationAttributes(EnableDubboConfigBindings.class.getName()));
 
+        //获取 EnableDubboConfigBindings注解所有值
+        //Dubbo会根据用户配置属性自动填充这些承载的对象
         AnnotationAttributes[] annotationAttributes = attributes.getAnnotationArray("value");
 
         DubboConfigBindingRegistrar registrar = new DubboConfigBindingRegistrar();
         registrar.setEnvironment(environment);
 
         for (AnnotationAttributes element : annotationAttributes) {
-
+            //将每个EnableDubboConfigBinding注解包含的Bean注册到spring容器中
             registrar.registerBeanDefinitions(element, registry);
 
         }

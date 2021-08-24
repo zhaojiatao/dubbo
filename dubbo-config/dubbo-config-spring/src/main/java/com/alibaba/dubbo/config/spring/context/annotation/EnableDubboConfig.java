@@ -61,6 +61,9 @@ import java.lang.annotation.Target;
  * @see DubboConfigConfiguration
  * @see DubboConfigConfigurationRegistrar
  * @since 2.5.8
+ *
+ * 当spring容器启动的时候，如果注解上面使用@Import，则会触发其注解方法：DubboConfigConfigurationRegistrar.registerBeanDefinitions()
+ *
  */
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
