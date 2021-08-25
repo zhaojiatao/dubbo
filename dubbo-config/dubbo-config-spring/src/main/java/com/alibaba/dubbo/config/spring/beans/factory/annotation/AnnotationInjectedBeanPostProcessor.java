@@ -123,8 +123,14 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
     public PropertyValues postProcessPropertyValues(
             PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) throws BeanCreationException {
 
+        //① 查找Bean所有标注了@Reference的字段和方法
+        //因为处理器 ReferenceAnnotationBeanPostProcessor 实现了 InstantiationAwareBeanPostProcessor
+        //接口，所以在Spring的Bean中初始化前会触发postProcessPropertyValues方法，该方法允许我们做进一步处理，比如增加属性和属性值修改等。
+        //在①中主要利用这个扩展点查找服务引用的字段或方法。
         InjectionMetadata metadata = findInjectionMetadata(beanName, bean.getClass(), pvs);
         try {
+            //②对字段、方法进行反射绑定
+            //在②中触发字段或反射方法值的注入，字段处理会调用findFieldReferenceMetadata方法
             metadata.inject(bean, beanName, pvs);
         } catch (BeanCreationException ex) {
             throw ex;
@@ -149,7 +155,6 @@ public abstract class AnnotationInjectedBeanPostProcessor<A extends Annotation> 
         ReflectionUtils.doWithFields(beanClass, new ReflectionUtils.FieldCallback() {
             @Override
             public void doWith(Field field) throws IllegalArgumentException, IllegalAccessException {
-
                 A annotation = getAnnotation(field, getAnnotationType());
 
                 if (annotation != null) {

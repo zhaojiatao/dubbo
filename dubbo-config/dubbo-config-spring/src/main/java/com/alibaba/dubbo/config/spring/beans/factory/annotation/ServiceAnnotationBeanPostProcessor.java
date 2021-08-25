@@ -102,14 +102,13 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
     public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
 
         //①获取用户注解配置的包扫描
-        //①：Dubbo框架首先会提取用户配置的扫描包名称，因为包名可能使用${...}占位符，因
+        //Dubbo框架首先会提取用户配置的扫描包名称，因为包名可能使用${...}占位符，因
         //此框架会调用Spring的占位符解析做进一步解码。
         Set<String> resolvedPackagesToScan = resolvePackagesToScan(packagesToScan);
 
         if (!CollectionUtils.isEmpty(resolvedPackagesToScan)) {
             //② 触发ServiceBean定义和注入
-            //②：开始真正的注解扫描，委托Spring对所
-            //有符合包名的.class文件做字节码分析
+            //开始真正的注解扫描，委托Spring对所有符合包名的.class文件做字节码分析
             registerServiceBeans(resolvedPackagesToScan, registry);
         } else {
             if (logger.isWarnEnabled()) {
@@ -134,7 +133,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
         BeanNameGenerator beanNameGenerator = resolveBeanNameGenerator(registry);
 
         scanner.setBeanNameGenerator(beanNameGenerator);
-        //③ 指定扫描dubbo的注解^Service,不会扫描Spring的Service注解
+        //③ 指定扫描dubbo的注解@Service,不会扫描Spring的Service注解
         scanner.addIncludeFilter(new AnnotationTypeFilter(Service.class));
 
         for (String packageToScan : packagesToScan) {
@@ -144,6 +143,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
             scanner.scan(packageToScan);
 
             //⑤ 对扫描的服务创建 BeanDefinitionHolder,用于生成 ServiceBean 定义
+            //在⑤中主要根据注册的普通Bean生成ServiceBean的占位符，用于后面的属性注入逻辑。
             // Finds all BeanDefinitionHolders of @Service whether @ComponentScan scans or not.
             Set<BeanDefinitionHolder> beanDefinitionHolders =
                     findServiceBeanDefinitionHolders(scanner, packageToScan, registry, beanNameGenerator);

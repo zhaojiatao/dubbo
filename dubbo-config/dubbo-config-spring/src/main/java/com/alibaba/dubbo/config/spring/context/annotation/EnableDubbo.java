@@ -38,6 +38,10 @@ import java.lang.annotation.Target;
  * @since 2.5.8
  *
  * 注解组合需要分三步，1.自定义新注解 2.新注解写要引入的注解 3.使用@AliasFor建立新老注解的属性对应关系
+ *
+ * 当用户使用注解旧DubboComponentScan 时，会激活 DubboComponentScanRegistrar,
+ * 同时生成 ServiceAnnotationBeanPostProcessor 和 ReferenceAnnotationBeanPostProcessor
+ * 两种处理器，通过名称很容易知道分别是处理服务注解和消费注解。
  */
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
