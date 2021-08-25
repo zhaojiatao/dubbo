@@ -103,6 +103,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
             }
+            //框架真正进行服务暴露的入口点
             export();
         }
     }

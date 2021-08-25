@@ -158,6 +158,11 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         }
     }
 
+    /**
+     * 会自动获取用户配置的注册中心，如果没有显示指定服务注册中心，则默认会用全局配置的注册中心
+     * @param provider
+     * @return
+     */
     protected List<URL> loadRegistries(boolean provider) {
         checkRegistry();
         List<URL> registryList = new ArrayList<URL>();

@@ -72,6 +72,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     private static final long serialVersionUID = 3033787999037024738L;
 
+    /**
+     * 在加载 protocol 扩展点时会自动注入 Protocol Listenerwrapper 和 ProtocolFilterWrapper
+     */
     private static final Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
 
     private static final ProxyFactory proxyFactory = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();
@@ -215,6 +218,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 }
             }, delay, TimeUnit.MILLISECONDS);
         } else {
+            //框架真正进行服务暴露的入口点
             doExport();
         }
     }
@@ -224,8 +228,6 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
      */
     protected synchronized void doExport() {
         if (unexported) {
-
-
             throw new IllegalStateException("Already unexported!");
         }
         if (exported) {
@@ -235,6 +237,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (interfaceName == null || interfaceName.length() == 0) {
             throw new IllegalStateException("<dubbo:service interface=\"\" /> interface not allow null!");
         }
+        //属性注入，执行覆盖策略
         checkDefault();
         if (provider != null) {
             if (application == null) {
@@ -322,6 +325,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (path == null || path.length() == 0) {
             path = interfaceName;
         }
+        //Dubbo支持多注册中心同时写，如果配置了服务同时注册多个注册中心，则会在
+        //ServiceConfig#doExportUrls中依次暴露
         doExportUrls();
         CodecSupport.addProviderSupportedSerialization(getUniqueServiceName(), getExportedUrls());
         ProviderModel providerModel = new ProviderModel(getUniqueServiceName(), this, ref);
@@ -362,16 +367,22 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
-        List<URL> registryURLs = loadRegistries(true);
+        List<URL> registryURLs = loadRegistries(true);//获取当前服务对应的注册中心实例
         for (ProtocolConfig protocolConfig : protocols) {
-            doExportUrlsFor1Protocol(protocolConfig, registryURLs);
+            //真实服务暴露逻辑是在doExportUrlsFor1Protocol方法中实现的
+            doExportUrlsFor1Protocol(protocolConfig, registryURLs);//如果服务指定暴露多个协议(Dubbo、Rest)，则依次暴露服务
         }
     }
 
+    /**
+     * 服务暴露逻辑
+     * @param protocolConfig
+     * @param registryURLs
+     */
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
         String name = protocolConfig.getName();
         if (name == null || name.length() == 0) {
-            name = "dubbo";
+            name = "dubbo";//默认使用dubbo协议
         }
 
         Map<String, String> map = new HashMap<String, String>();
@@ -381,8 +392,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (ConfigUtils.getPid() > 0) {
             map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
         }
+        //①读取其他配置信息到map，用于后续构造URL
         appendParameters(map, application);
         appendParameters(map, module);
+        //②读取全局配置信息，会自动添加前缀
+        //在②中主要区分全局配置，默认在属性前面增加default.前缀，当框架获取URL中的参数时，如果不存在则会自动尝试获取default.前缀对应的值。
         appendParameters(map, provider, Constants.DEFAULT_KEY);
         appendParameters(map, protocolConfig);
         appendParameters(map, this);
@@ -492,6 +506,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!Constants.SCOPE_REMOTE.toString().equalsIgnoreCase(scope)) {
+                //③本地服务暴露
+                //在③中主要处理本地内存JVM协议暴露
                 exportLocal(url);
             }
             // export to remote if the config is not local (export to local only when config is local)
@@ -504,6 +520,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                         url = url.addParameterIfAbsent(Constants.DYNAMIC_KEY, registryURL.getParameter(Constants.DYNAMIC_KEY));
                         URL monitorUrl = loadMonitor(registryURL);
                         if (monitorUrl != null) {
+                            //④ 如果配置了监控地址，则服务调用信息会上报
+                            //在④中主要追加监控上报地址，框架会在拦截器中执行数据上报，这部分是可选的。
                             url = url.addParameterAndEncoded(Constants.MONITOR_KEY, monitorUrl.toFullString());
                         }
                         if (logger.isInfoEnabled()) {
@@ -516,16 +534,30 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                             registryURL = registryURL.addParameter(Constants.PROXY_KEY, proxy);
                         }
 
+                        //⑤通过动态代理转换成Invoker, registryURL存储的是注册中心地址，使用export作为key追加服务元数据信息
+                        //在⑤中会通过动态代理的方式创建Invoker对象，在服务端生成的是AbstractProxylnvoker实例，
+                        // 所有真实的方法调用都会委托给代理，然后代理转发给服务ref 调用。
+                        //目前框架实现两种代理：JavassistProxyFactory 和 JdkProxyFactory。
+                        //JavassistProxyFactory模式原理：创建Wrapper子类,在子类中实现invokeMethod方法，方
+                        //法体内会为每个ref方法都做方法名和方法参数匹配校验，如果匹配则直接调用即可，相比
+                        //DdkProxyFactory省去了反射调用的开销。DdkProxyFactory模式是我们常见的用法，通过反射
+                        //获取真实对象的方法，然后调用即可。
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
 
-                        Exporter<?> exporter = protocol.export(wrapperInvoker);
+                        //⑥服务暴露后向注册中心注册服务信息
+                        //在⑥中主要先触发服务暴露(端口打开等)，然后进行服务元数据注册。
+                        Exporter<?> exporter = protocol.export(wrapperInvoker);//RegistryProtocol#export
                         exporters.add(exporter);
                     }
                 } else {
                     Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);
                     DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
 
+                    //⑦处理没有注册中心场景，直接暴露服务
+                    //在⑦中主要处理没有使用注册中心的场景，直接进行服务暴露，不需要元数据注册，
+                    //因为这里暴露的URL信息是以具体RPC协议开头的，并不是以注册中心协议开头的。
                     Exporter<?> exporter = protocol.export(wrapperInvoker);
                     exporters.add(exporter);
                 }
@@ -706,6 +738,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return port;
     }
 
+    /**
+     * 在服务暴露前会按照覆盖策略生效，主要处理思路就是遍历服务的
+     * 所有方法，如果没有值则尝试从 D选项中读取，如果还没有则自动从配置文件dubbo.properties
+     * 中读取
+     */
     private void checkDefault() {
         if (provider == null) {
             provider = new ProviderConfig();

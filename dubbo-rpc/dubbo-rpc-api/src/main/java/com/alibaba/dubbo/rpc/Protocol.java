@@ -33,6 +33,14 @@ public interface Protocol {
      */
     int getDefaultPort();
 
+
+    /**
+     * ServiceConfig中
+     * private static final Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
+     * 会扫描该接口中得本方法。
+     * 由于@Adaptive注解没有传入key参数，则会默认把类名Protocol转化protocol作为@Adaptive注解的key
+     * 如果URL中有protocol则据此动态获取拓展点实现名称，如果URL中没有，则取@SPI(dubbo)中的dubbo实现
+     */
     /**
      * Export service for remote invocation: <br>
      * 1. Protocol should record request source address after receive a request:

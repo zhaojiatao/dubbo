@@ -26,6 +26,9 @@ import java.util.List;
 
 /**
  * AdaptiveExtensionFactory
+ * 既然工厂接口有多个实现，那么是怎么确定使用哪个工厂实现的呢？我们可以看到
+ * AdaptiveExtensionFactory 这个实现类工厂上W@Adaptive 注解。因此，AdaptiveExtensionFactory
+ * 会作为一开始的默认实现。
  */
 @Adaptive
 public class AdaptiveExtensionFactory implements ExtensionFactory {
